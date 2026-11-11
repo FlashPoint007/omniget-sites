@@ -1,0 +1,73 @@
+{
+  "tag": "v0.15.1",
+  "published": "2026-11-09T17:06:06Z",
+  "url": "https://github.com/OpenSelena/omniget/releases/tag/v0.15.1",
+  "assets": [
+    {
+      "name": "OmniGet-0.15.1-1.aarch64.rpm",
+      "size": 45625150,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet-0.15.1-1.aarch64.rpm",
+      "digest": "sha256:1974fa22e7f319906131d7d254093f1e8264dd795327826add993bd81e39683c"
+    },
+    {
+      "name": "OmniGet-0.15.1-1.x86_64.rpm",
+      "size": 46851265,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet-0.15.1-1.x86_64.rpm",
+      "digest": "sha256:303227938b526a2b6bc428e963aa30fb3f3b13ae9652bc62580910c19f96837c"
+    },
+    {
+      "name": "OmniGet_0.15.1_aarch64.AppImage",
+      "size": 182086152,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_aarch64.AppImage",
+      "digest": "sha256:90f65c201cc4d0b51a81d13d11980de10188285d7051f9f7815edf5cfc48263c"
+    },
+    {
+      "name": "OmniGet_0.15.1_aarch64.dmg",
+      "size": 43869710,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_aarch64.dmg",
+      "digest": "sha256:11fd017e50a01b64ba9a12c05ce44cfabc18b7ba33cae003a406f10aa08d3c24"
+    },
+    {
+      "name": "OmniGet_0.15.1_amd64.AppImage",
+      "size": 178293240,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_amd64.AppImage",
+      "digest": "sha256:afb1eaab87c3cb7eda07929cb0a221a2f39489aec1d094c94a0dde2303fcd976"
+    },
+    {
+      "name": "OmniGet_0.15.1_amd64.deb",
+      "size": 46837942,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_amd64.deb",
+      "digest": "sha256:ef61cdb27720ac5b76b43077e526c74c29a94d6d8a9605d05102c15c04d6119f"
+    },
+    {
+      "name": "OmniGet_0.15.1_arm64.deb",
+      "size": 45609860,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_arm64.deb",
+      "digest": "sha256:93eec2b6606e0e7d5cd7b5526adf2499e2f87cb77b071a5136272707abb13567"
+    },
+    {
+      "name": "omniget_0.15.1_x64-portable.exe",
+      "size": 106133504,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/omniget_0.15.1_x64-portable.exe",
+      "digest": "sha256:b08853dc6e38bc3626e1c1cd407ffa842143a5b0554742e7a10ad819b70f8906"
+    },
+    {
+      "name": "OmniGet_0.15.1_x64-setup.exe",
+      "size": 35919588,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_x64-setup.exe",
+      "digest": "sha256:33e183093b4c1c76702748827d318b32f9229adc7ec5266fdbd844fa83c67ff7"
+    },
+    {
+      "name": "OmniGet_0.15.1_x64.dmg",
+      "size": 45459741,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_x64.dmg",
+      "digest": "sha256:032c7a587c1cad028eed34e558aa47ef310594aed44d4662396b36171107c32b"
+    },
+    {
+      "name": "OmniGet_0.15.1_x64_en-US.msi",
+      "size": 46295224,
+      "url": "https://github.com/OpenSelena/omniget/releases/download/v0.15.1/OmniGet_0.15.1_x64_en-US.msi",
+      "digest": "sha256:ad094dd1ed2f9f01e315d5d50f0c4859a2ab3b7efbdfe7d3609902a141695d13"
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0e1421">
+  <meta name="description" content="OmniGet 网页下载工作台。批量整理链接、保存文件直链，并将平台媒体和磁力任务发送到本机 OmniGet。">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>OmniGet Web · 下载工作台</title>
+  <link rel="icon" href="./assets/omniget.png" type="image/png">
+  <link rel="stylesheet" href="./assets/site.css">
+  <script src="./app.mjs" type="module"></script>
+</head>
+<body>
+  <svg class="symbol-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.8 1.8m2.5 4.5a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.8-1.8"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4m-4 0h8"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zm8 0v5h4m-9 4h6m-6 4h6"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m0 8h8m-8 4h6"/></symbol>
+    <symbol id="i-tray" viewBox="0 0 24 24"><path d="M4 5h16l2 8v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-5l2-8Zm-2 8h6l1.5 2h5l1.5-2h6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.3-4.3-2.2-6-2.5m12 5v-3.2a2.8 2.8 0 0 0-.8-2.2c2.7-.3 5.5-1.3 5.5-6a4.7 4.7 0 0 0-1.3-3.2 4.4 4.4 0 0 0-.1-3.3s-1-.3-3.4 1.3a12.6 12.6 0 0 0-6.2 0C6.4 3.3 5.4 3.6 5.4 3.6a4.4 4.4 0 0 0-.1 3.3A4.7 4.7 0 0 0 4 10.1c0 4.7 2.8 5.7 5.5 6A2.8 2.8 0 0 0 8.7 18v3.5"/></symbol>
+  </svg>
+
+  <a class="skip-link" href="#workspace">跳到下载工作台</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#workspace" aria-label="OmniGet Web 首页">
+        <img src="./assets/omniget.png" alt="" width="38" height="38">
+        <span>OmniGet<span class="brand-web"> Web</span></span>
+      </a>
+      <nav class="site-nav" aria-label="主导航">
+        <a href="#workspace" aria-current="location">工作台</a>
+        <a href="#desktop">桌面版</a>
+        <a href="#guide">使用说明</a>
+      </nav>
+      <a class="button button-quiet repo-link" href="https://github.com/FlashPoint007/omniget-sites" target="_blank" rel="noopener noreferrer">
+        <svg class="icon" aria-hidden="true"><use href="#i-github"></use></svg><span>GitHub</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="shell" id="workspace">
+    <section class="intro" aria-labelledby="main-title">
+      <div>
+        <h1 id="main-title">下载工作台</h1>
+        <p>粘贴文件或媒体链接，集中管理下载任务。</p>
+      </div>
+      <a class="button button-outline intro-link" href="#desktop">
+        <svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg>
+        下载桌面版
+        <svg class="icon small" aria-hidden="true"><use href="#i-arrow"></use></svg>
+      </a>
+    </section>
+
+    <div class="workspace-grid">
+      <section class="panel composer" aria-labelledby="composer-title">
+        <div class="panel-heading">
+          <div class="section-icon accent"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg></div>
+          <div><h2 id="composer-title">添加链接</h2><p>支持文件直链、媒体页面和磁力链接</p></div>
+        </div>
+        <form id="link-form">
+          <div class="switcher" role="group" aria-label="输入方式">
+            <button type="button" data-input-mode="single" aria-pressed="true"><svg class="icon small" aria-hidden="true"><use href="#i-link"></use></svg>单条链接</button>
+            <button type="button" data-input-mode="batch" aria-pressed="false"><svg class="icon small" aria-hidden="true"><use href="#i-layers"></use></svg>批量添加</button>
+          </div>
+          <div class="input-box" id="input-box">
+            <label class="visually-hidden" for="links">下载链接</label>
+            <textarea id="links" name="links" rows="1" maxlength="131072" spellcheck="false" autocomplete="off" placeholder="https://..." aria-describedby="form-hint" required></textarea>
+            <button id="paste-link" class="button button-quiet paste" type="button"><svg class="icon small" aria-hidden="true"><use href="#i-clipboard"></use></svg>粘贴</button>
+          </div>
+          <div class="composer-actions">
+            <label class="select-field"><span class="visually-hidden">下载方式</span>
+              <select id="route"><option value="auto">自动识别</option><option value="direct">文件直链</option><option value="desktop">本机 OmniGet</option></select>
+            </label>
+            <button id="use-sample" class="button button-quiet sample" type="button">试用示例</button>
+            <button id="import-links" class="button button-quiet" type="button" hidden><svg class="icon small" aria-hidden="true"><use href="#i-file"></use></svg>导入 TXT</button>
+            <input id="file-input" type="file" accept=".txt,text/plain" hidden>
+            <button class="button button-primary submit" type="submit"><svg class="icon small" aria-hidden="true"><use href="#i-plus"></use></svg>加入队列</button>
+          </div>
+          <p class="form-note" id="form-hint" role="status">签名链接和任务记录保留在当前浏览器会话。</p>
+        </form>
+      </section>
+
+      <aside class="panel bridge" aria-labelledby="bridge-title">
+        <div class="panel-heading">
+          <div class="section-icon cool"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg></div>
+          <div><h2 id="bridge-title">本机 OmniGet</h2><p>处理平台视频与磁力任务</p></div>
+        </div>
+        <div class="bridge-state" id="bridge-state" role="status"><span class="status-dot"></span><span id="bridge-status">未连接桌面端</span></div>
+        <p class="bridge-copy">配对后可批量发送任务，并在网页上查看桌面端进度。</p>
+        <button class="button button-outline bridge-action" id="open-bridge" type="button">连接桌面端<svg class="icon small" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
+        <a class="bridge-help" href="#guide">查看连接方法</a>
+      </aside>
+
+      <section class="panel queue" aria-labelledby="queue-title">
+        <div class="queue-heading">
+          <div class="panel-heading">
+            <div class="section-icon neutral"><svg class="icon" aria-hidden="true"><use href="#i-tray"></use></svg></div>
+            <div><h2 id="queue-title">下载队列 <span class="counter" id="queue-count">0</span></h2><p>选择任务的下载方式并查看状态</p></div>
+          </div>
+          <div class="queue-controls">
+            <button class="button button-outline" id="batch-send" type="button" hidden>发送待处理媒体</button>
+            <button class="button button-quiet" id="clear-finished" type="button" hidden>清理记录</button>
+          </div>
+        </div>
+        <div class="queue-filters" role="group" aria-label="按状态筛选">
+          <button type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter="pending" aria-pressed="false">待处理</button>
+          <button type="button" data-filter="active" aria-pressed="false">进行中</button>
+          <button type="button" data-filter="done" aria-pressed="false">已交接或完成</button>
+          <button type="button" data-filter="errors" aria-pressed="false">失败</button>
+        </div>
+        <div class="queue-empty" id="queue-empty">
+          <div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-tray"></use></svg></div>
+          <strong id="empty-title">队列为空</strong>
+          <p id="empty-copy">添加链接后，从这里启动下载。</p>
+        </div>
+        <ul id="queue-list" class="queue-list" aria-label="下载任务"></ul>
+      </section>
+    </div>
+
+    <section class="section-block" id="desktop" aria-labelledby="desktop-title">
+      <div class="section-title">
+        <div>
+          <h2 id="desktop-title">下载 OmniGet 桌面版</h2>
+          <p>安装包由 OpenSelena 的 GitHub Releases 提供。</p>
+        </div>
+        <a class="button button-outline" id="release-page" href="https://github.com/OpenSelena/omniget/releases/latest" target="_blank" rel="noopener noreferrer">上游发行页 <svg class="icon small" aria-hidden="true"><use href="#i-external"></use></svg></a>
+      </div>
+      <div class="panel installers">
+        <div class="installer-heading">
+          <div class="switcher" role="group" aria-label="桌面系统">
+            <button type="button" data-os="windows" aria-pressed="true">Windows</button>
+            <button type="button" data-os="macos" aria-pressed="false">macOS</button>
+            <button type="button" data-os="linux" aria-pressed="false">Linux</button>
+          </div>
+          <p class="release-label" id="release-label" role="status">读取发行版本…</p>
+        </div>
+        <div class="installer-list" id="installer-list"></div>
+      </div>
+    </section>
+
+    <section class="section-block" id="guide" aria-labelledby="guide-title">
+      <div class="section-title"><div><h2 id="guide-title">使用说明</h2></div></div>
+      <div class="panel guide">
+        <details>
+          <summary>如何保存文件直链？</summary>
+          <p>把文件地址加入队列，点击「保存文件」。源站需允许浏览器跨域读取。遇到跨域限制可点「打开源文件」，再使用浏览器的保存功能。对于无扩展名的文件，添加时可手动选择「文件直链」。</p>
+          <p>普通保存最多在内存中读取 64 MiB。支持文件选择器的浏览器可用「流式保存」直接写入本机。</p>
+        </details>
+        <details id="guide-bridge">
+          <summary>如何连接本机 OmniGet？</summary>
+          <ol>
+            <li>安装并启动 OmniGet v0.15.1 或更新版本。</li>
+            <li>在「设置 → 插件 → 浏览器扩展」找到本机端点和配对令牌。</li>
+            <li>点网页的「连接桌面端」，填写端口和令牌。浏览器可能会请求访问本机网络。</li>
+            <li>发送任务后，按桌面端设置选择下载目录或使用默认目录。连接失败时，也可以逐条点「用桌面打开」。</li>
+          </ol>
+        </details>
+        <details>
+          <summary>哪些功能在桌面端处理？</summary>
+          <p>哔哩哔哩、YouTube、Instagram 等媒体页面，HLS / DASH 和磁力任务交给桌面 OmniGet。Udemy、Hotmart 和 Telegram 由桌面插件处理，转码、转写和阅读工具也在桌面端使用。</p>
+          <p>网页只发送选中的任务链接和桌面控制请求到本机 OmniGet。需要登录的内容请在桌面端按上游流程授权。</p>
+        </details>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-info"><svg class="icon small" aria-hidden="true"><use href="#i-lock"></use></svg>文件由浏览器或本机 OmniGet 下载</div>
+      <div>GPL-3.0 · 基于 <a href="https://github.com/OpenSelena/omniget" target="_blank" rel="noopener noreferrer">OpenSelena/omniget</a></div>
+    </footer>
+  </main>
+
+  <dialog id="bridge-dialog" aria-labelledby="connect-title">
+    <div class="dialog-top">
+      <div class="section-icon cool"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg></div>
+      <button id="close-bridge" class="button button-quiet icon-button" type="button" aria-label="关闭连接面板"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button>
+    </div>
+    <h2 id="connect-title">连接桌面端</h2>
+    <p class="dialog-intro">打开 OmniGet 的「设置 → 插件 → 浏览器扩展」，复制本机端点和配对令牌。</p>
+    <form id="bridge-form">
+      <label for="bridge-port">端口或本机端点</label>
+      <input id="bridge-port" type="text" value="47720" maxlength="80" autocomplete="off" spellcheck="false" required>
+      <label for="bridge-token">配对令牌</label>
+      <input id="bridge-token" type="password" maxlength="80" placeholder="粘贴桌面端的令牌" autocomplete="off" spellcheck="false" required>
+      <p class="dialog-note">令牌仅在当前页面内存中使用，并发送给 127.0.0.1 上的桌面端。刷新页面后需重新连接。</p>
+      <p class="form-note" id="bridge-message" role="status"></p>
+      <button id="connect-bridge" class="button button-primary" type="submit">连接并验证</button>
+    </form>
+  </dialog>
+  <p class="toast" id="toast" role="status" hidden></p>
+  <noscript><div class="noscript">请启用 JavaScript 以使用下载工作台。</div></noscript>
+</body>
+</html>
