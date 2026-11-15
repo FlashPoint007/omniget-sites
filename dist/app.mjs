@@ -1,5 +1,6 @@
 import { desktopScheme, formatBytes, parseLines, readLink, ROUTE_LABELS } from './lib/links.mjs';
-import { connectBridge, taskProgress } from './lib/bridge.mjs';
+import { connectBridge } from './lib/bridge.mjs';
+import { createTaskTracker } from './lib/task-tracker.mjs';
 import { DownloadError, saveDirect } from './lib/download.mjs';
 import { assetsFor, fetchRelease } from './lib/releases.mjs';
 
@@ -12,7 +13,7 @@ const STATUS = {
   saved: ['已保存', 'done'],
   sending: ['正在发送', 'active'],
   opened: ['已请求打开桌面端', 'done'],
-  accepted: ['桌面端已接收', 'done'],
+  accepted: ['桌面请求待确认', 'active'],
   'desktop-queued': ['桌面端排队中', 'active'],
   'desktop-active': ['桌面端下载中', 'active'],
   'desktop-paused': ['桌面端已暂停', 'active'],
@@ -34,6 +35,7 @@ let items = restoreQueue();
 let filter = 'all';
 let inputMode = 'single';
 let bridge = null;
+const taskTracker = createTaskTracker();
 let bridgeAttempt = 0;
 let polling = false;
 let pollFailures = 0;
@@ -82,14 +84,15 @@ function restoreQueue() {
       if (!item || typeof item.url !== 'string' || !/^[0-9a-f-]{36}$/i.test(item.id)) return [];
       const link = readLink(item.url, item.mode);
       if (!link) return [];
-      const interrupted = item.state === 'receiving' || item.state === 'sending';
+      const interrupted = item.state === 'receiving';
+      const unconfirmed = item.state === 'sending' || TRACKED.has(item.state);
       return [{
         ...link,
         id: item.id,
         mode: item.mode,
-        state: !interrupted && Object.hasOwn(STATUS, item.state) ? item.state : 'pending',
-        detail: interrupted ? '上次操作未确认，请核对后重试。' : String(item.detail || '').slice(0, 300),
-        pct: typeof item.pct === 'number' ? Math.min(100, Math.max(0, item.pct)) : null,
+        state: unconfirmed ? 'accepted' : !interrupted && Object.hasOwn(STATUS, item.state) ? item.state : 'pending',
+        detail: unconfirmed ? '页面已重新加载，任务结果未知，请在桌面端核对。' : interrupted ? '上次操作未确认，请核对后重试。' : String(item.detail || '').slice(0, 300),
+        pct: !unconfirmed && typeof item.pct === 'number' ? Math.min(100, Math.max(0, item.pct)) : null,
         bytes: '',
       }];
     });
@@ -311,6 +314,12 @@ function renderBridge() {
 function disconnect(text) {
   bridge = null;
   pollFailures = 0;
+  for (const item of items) {
+    if (TRACKED.has(item.state) || item.state === 'sending') {
+      Object.assign(item, { state: 'accepted', pct: null, detail: '连接已断开，任务结果未知，请在桌面端核对。' });
+    }
+  }
+  persist();
   renderBridge();
   if (text) notify(text);
 }
@@ -320,11 +329,13 @@ async function sendOne(item) {
   const connection = bridge;
   setItem(item, 'sending');
   try {
-    await connection.enqueue(item.url);
-    setItem(item, 'accepted', '请按桌面端设置确认下载。');
+    const result = await taskTracker.send(connection, item, () => bridge === connection && items.includes(item));
+    if (bridge !== connection || !items.includes(item)) return false;
+    setItem(item, result.state, result.detail);
     void pollQueue();
     return true;
   } catch (error) {
+    if (bridge !== connection || !items.includes(item)) return false;
     const uncertain = error.code === 'unreachable';
     setItem(item, 'error', uncertain ? '未收到确认。请先检查桌面队列，再决定是否重试。' : error.message);
     if ((uncertain || error.code === 'unauthorized') && bridge === connection) disconnect(error.message);
@@ -337,21 +348,12 @@ async function pollQueue() {
   if (!connection || polling || document.hidden || !items.some(({ state }) => TRACKED.has(state))) return;
   polling = true;
   try {
-    const desktopItems = await connection.queue();
+    const updates = await taskTracker.poll(connection);
     if (connection !== bridge) return;
-    if (!Array.isArray(desktopItems)) throw new Error('无效队列');
     pollFailures = 0;
-    const byUrl = new Map();
-    for (const entry of desktopItems) {
-      if (!entry || typeof entry.url !== 'string') continue;
-      const existing = byUrl.get(entry.url);
-      if (!existing || Number(entry.id) > Number(existing.id)) byUrl.set(entry.url, entry);
-    }
     let changed = false;
-    for (const item of items) {
-      if (!TRACKED.has(item.state)) continue;
-      const desktopItem = byUrl.get(item.url);
-      const next = desktopItem ? taskProgress(desktopItem) : null;
+    for (const { item, ...next } of updates) {
+      if (!items.includes(item) || !TRACKED.has(item.state)) continue;
       if (!next || (item.state === next.state && item.pct === next.pct && item.detail === next.detail)) continue;
       Object.assign(item, next);
       changed = true;
@@ -525,7 +527,7 @@ $('batch-send').addEventListener('click', async () => {
     sendingBatch = false;
     renderQueue();
   }
-  if (sent) notify('桌面端已接收 ' + sent + ' / ' + pending.length + ' 条任务。');
+  if (sent) notify('桌面端已接收 ' + sent + ' / ' + pending.length + ' 条请求，任务创建仍待确认。');
 });
 
 $('open-bridge').addEventListener('click', () => {
