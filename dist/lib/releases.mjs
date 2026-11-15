@@ -1,5 +1,8 @@
-const RELEASE_URL = 'https://github.com/OpenSelena/omniget/releases';
-const API_URL = 'https://api.github.com/repos/OpenSelena/omniget/releases/latest';
+const RELEASE_URL = 'https://github.com/OpenSelena/libreget/releases';
+const API_URL = 'https://api.github.com/repos/OpenSelena/libreget/releases/latest';
+// Same upstream repository (GitHub ID 1293138603), renamed from omniget.
+// Keep the legacy path for bundled snapshots; never allow arbitrary GitHub repos.
+const RELEASE_URLS = [RELEASE_URL, 'https://github.com/OpenSelena/omniget/releases'];
 
 const BUILDS = {
   windows: [
@@ -26,14 +29,16 @@ const BUILDS = {
 };
 
 function normalize(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid release data');
   const tag = data.tag || data.tag_name;
-  if (!/^v?\d+\.\d+\.\d+(?:[-.a-zA-Z0-9]*)$/.test(tag)) throw new Error('Invalid release tag');
+  if (typeof tag !== 'string' || !/^v?\d+\.\d+\.\d+(?:[-.a-zA-Z0-9]*)$/.test(tag)) throw new Error('Invalid release tag');
   const assets = (Array.isArray(data.assets) ? data.assets : []).flatMap((asset) => {
+    if (!asset || typeof asset !== 'object') return [];
     const url = asset.url || asset.browser_download_url;
     // In GitHub's REST response asset.url is the API URL; prefer the download URL.
     const download = asset.browser_download_url || url;
-    if (!/^[a-z0-9_.-]{1,140}$/i.test(asset.name) ||
-      download !== RELEASE_URL + '/download/' + tag + '/' + asset.name ||
+    if (typeof asset.name !== 'string' || !/^[a-z0-9_.-]{1,140}$/i.test(asset.name) ||
+      !RELEASE_URLS.some((base) => download === base + '/download/' + tag + '/' + asset.name) ||
       !Number.isSafeInteger(asset.size) || asset.size <= 0) return [];
     const digest = /^sha256:[0-9a-f]{64}$/i.test(asset.digest || '') ? asset.digest.slice(7) : '';
     return [{ name: asset.name, url: download, size: asset.size, digest }];
