@@ -17,13 +17,15 @@ OmniGet Web adapts [OmniGet](https://github.com/OpenSelena/omniget) into a Sites
 | --- | --- |
 | Direct files | Public HTTP(S) files, signed URLs and extensionless endpoints |
 | Media pages | Extract full files from video/audio/source tags, Open Graph and JSON-LD |
-| Bilibili | Public progressive video files, including the requested part; available quality depends on the source |
+| Bilibili | WBI-signed video metadata and playback requests, including the selected part; quality follows the source response |
 | YouTube | Direct complete audio/video URLs exposed in the page response; additional signatures or verification may prevent retrieval |
 | Large files | Streamed through the Worker to the browser download manager without a whole-file page buffer |
 | Multiple files and batches | Select a discovered file; import UTF-8 TXT or paste multiple links and download individually |
 | Session queue | Deduplication, filters and up to 50 items in the current browser session |
 
 Login, paid access, DRM, additional platform signatures and segmented-stream merging may prevent extraction. The web entry point accepts HTTP(S) URLs.
+
+Bilibili may reject requests from the hosted server with HTTP 412, including requests for the public player signing keys. WBI signing does not remove this restriction or guarantee downloads of every public video. The page reports the failing stage and does not initiate a download when blocked. Do not provide Bilibili cookies to this site.
 
 ## Quick start
 

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
+import { signBilibiliQuery, wbiMD5, wbiMixin } from '../worker/bilibili-sign.mjs';
 import { readFile } from 'node:fs/promises';
 import { createApp, publicURL } from '../worker/app.mjs';
 import { readLink } from '../dist/lib/links.mjs';
@@ -80,27 +83,82 @@ test('HTML video, Open Graph and JSON-LD media are resolved to downloadable orig
   assert.match(result.files[1].name, /\.mp3$/);
 });
 
-test('Bilibili progressive download uses the requested part and the required CDN Referer', async () => {
+test('Bilibili uses WBI metadata and player with the requested part and CDN Referer', async () => {
+  const keys = { img: '7cd084941338484aae1ad9425b84077c', sub: '4932caff0ff746eab6f01bf08b70ac45' };
+  const metadata = { bvid: 'BV1GJ411x7h7', cid: 11, title: 'Sample', duration: 600,
+    pages: [{ cid: 11, duration: 420 }, { cid: 22, duration: 180 }] };
   const { app, calls } = fixture({
-    'api.bilibili.com/x/web-interface/view': () => Response.json({
-      code: 0, data: { title: 'Sample', pages: [{ cid: 11 }, { cid: 22 }] },
+    'api.bilibili.com/x/web-interface/wbi/view/detail': (_, url) => {
+      assert.equal(url.searchParams.get('bvid'), 'BV1GJ411x7h7');
+      assert.equal(url.searchParams.get('platform'), 'web');
+      assert.equal(url.searchParams.has('spm_id_from'), false);
+      const page = JSON.stringify({ code: 0, data: { View: metadata } });
+      return new Response(gzipSync(page), { headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
+    },
+    'api.bilibili.com/x/web-interface/nav': () => Response.json({
+      code: -101, data: { isLogin: false, wbi_img: {
+        img_url: 'https://i0.hdslb.com/bfs/wbi/' + keys.img + '.png',
+        sub_url: 'https://i0.hdslb.com/bfs/wbi/' + keys.sub + '.png',
+      } },
     }),
-    'api.bilibili.com/x/player/playurl': (_, url) => {
+    'api.bilibili.com/x/player/wbi/playurl': (_, url) => {
       assert.equal(url.searchParams.get('cid'), '22');
-      return Response.json({ code: 0, data: { quality: 32, durl: [{ url: 'https://cdn.example.com/video.mp4' }] } });
+      const query = url.search.slice(1);
+      const unsigned = query.split('&w_rid=')[0];
+      const signature = createHash('md5').update(unsigned + wbiMixin(keys.img, keys.sub)).digest('hex');
+      assert.equal(url.searchParams.get('w_rid'), signature);
+      return Response.json({ code: 0, data: { quality: 16, accept_quality: [16],
+        accept_description: ['360P'], durl: [{ url: 'https://cdn.example.com/video.mp4', length: 180000 }] } });
     },
     'cdn.example.com/video.mp4': (init) => {
-      assert.equal(init.headers.Referer, 'https://www.bilibili.com/');
+      assert.equal(init.headers.Referer, 'https://www.bilibili.com/video/BV1GJ411x7h7/?p=2');
       return new Response('video-and-audio', { headers: { 'Content-Type': 'video/mp4' } });
     },
   });
-  const response = await app.fetch(post('https://www.bilibili.com/video/BV1GJ411x7h7?p=2'), env);
+  const response = await app.fetch(post('https://www.bilibili.com/video/BV1GJ411x7h7?p=2&spm_id_from=test'), env);
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.files[0].name, 'Sample - P2.mp4');
+  assert.equal(result.files[0].label, '360P · 含音频');
   const download = await http(app, result.files[0].href);
   assert.equal(await download.text(), 'video-and-audio');
-  assert.ok(calls.some((call) => call.url.hostname === 'api.bilibili.com'));
+  assert.equal(calls.some((call) => call.url.pathname === '/x/web-interface/view'), false);
+});
+
+test('WBI checksum handles UTF-8 and block boundaries and signs canonical query values', () => {
+  for (const value of ['', 'a', 'abc', '中文😀', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(64), 'a'.repeat(4000)]) {
+    assert.equal(wbiMD5(value), createHash('md5').update(value).digest('hex'));
+  }
+  assert.equal(wbiMixin('invalid', 'invalid'), null);
+  const mixin = wbiMixin('7cd084941338484aae1ad9425b84077c', '4932caff0ff746eab6f01bf08b70ac45');
+  const result = signBilibiliQuery({ foo: 114, bar: 514, baz: 1919810 }, mixin, 1702204169);
+  assert.equal(result, 'bar=514&baz=1919810&foo=114&wts=1702204169&w_rid=6149fdadf571698ca7e6a567265cd0ee');
+});
+
+test('Bilibili security challenges stop extraction and invalid parts are rejected', async () => {
+  const { app, calls } = fixture({
+    'api.bilibili.com/x/web-interface/nav': () => Response.json({ data: { wbi_img: {
+      img_url: 'https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png',
+      sub_url: 'https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png',
+    } } }),
+    'api.bilibili.com/x/web-interface/wbi/view/detail': () => Response.json({ code: -352, message: 'challenge' }),
+  });
+  assert.equal((await app.fetch(post('https://www.bilibili.com/video/BV1GJ411x7h7'), env)).status, 403);
+  assert.equal(calls.some((call) => call.url.pathname === '/x/player/wbi/playurl'), false);
+  assert.equal((await app.fetch(post('https://www.bilibili.com/video/BV1GJ411x7h7?p=1.5'), env)).status, 400);
+});
+
+test('Bilibili upstream blocks identify the failing stage and stop further requests', async () => {
+  const { app, calls } = fixture({
+    'api.bilibili.com/x/web-interface/nav': () => new Response('blocked', { status: 412 }),
+  });
+  const response = await app.fetch(post('https://www.bilibili.com/video/BV1gfGw6RE5p/?spm_id_from=search'), env);
+  assert.equal(response.status, 403);
+  const result = await response.json();
+  assert.match(result.error, /获取播放器签名.*HTTP 412/);
+  assert.match(result.error, /当前无法从网页下载/);
+  assert.equal(result.files, undefined);
+  assert.equal(calls.filter((call) => call.url.hostname === 'api.bilibili.com').length, 1);
 });
 
 test('unsafe hosts, credentials, private DNS and redirect targets never reach upstream', async () => {

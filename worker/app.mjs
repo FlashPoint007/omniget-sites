@@ -1,3 +1,5 @@
+import { signBilibiliQuery, wbiMixin } from './bilibili-sign.mjs';
+
 const PAGE_LIMIT = 2 * 1024 * 1024;
 const TOKEN_LIFETIME = 2 * 60 * 60 * 1000;
 const MIME_TYPES = {
@@ -9,9 +11,10 @@ const MANIFEST = /\.(?:m3u8?|mpd)(?:$|\?)/i;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36';
 
 export class DownloadIssue extends Error {
-  constructor(message, status = 422) {
+  constructor(message, status = 422, upstreamStatus) {
     super(message);
     this.status = status;
+    this.upstreamStatus = upstreamStatus;
   }
 }
 
@@ -46,7 +49,7 @@ export function publicURL(raw) {
   return url;
 }
 
-async function readLimited(response, limit = PAGE_LIMIT) {
+async function readLimited(response, limit = PAGE_LIMIT, compressionDepth = 0) {
   const reader = response.body?.getReader();
   if (!reader) return '';
   const chunks = [];
@@ -66,6 +69,10 @@ async function readLimited(response, limit = PAGE_LIMIT) {
   const bytes = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  if (compressionDepth === 0 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const decoded = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return readLimited(new Response(decoded), limit, 1);
+  }
   return new TextDecoder().decode(bytes);
 }
 
@@ -125,8 +132,8 @@ export function pageMedia(html, pageURL) {
   return { title, files: candidates.slice(0, 12) };
 }
 
-function playerJSON(html) {
-  const start = /(?:ytInitialPlayerResponse\s*=|["']ytInitialPlayerResponse["']\s*:)\s*\{/.exec(html);
+function assignedJSON(html, pattern) {
+  const start = pattern.exec(html);
   if (!start) return null;
   const begin = start.index + start[0].lastIndexOf('{');
   let depth = 0;
@@ -248,7 +255,7 @@ export function createApp(assets, { fetch: upstreamFetch = (...args) => fetch(..
       }
       if (!response.ok) {
         await response.body?.cancel();
-        throw new DownloadIssue('源站返回 HTTP ' + response.status + '，该链接当前无法下载。', 502);
+        throw new DownloadIssue('源站返回 HTTP ' + response.status + '，该链接当前无法下载。', 502, response.status);
       }
       return { response, url: target.href };
     }
@@ -265,22 +272,74 @@ export function createApp(assets, { fetch: upstreamFetch = (...args) => fetch(..
   }
 
   async function bilibili(url, origin) {
-    const id = /\/(BV[0-9a-z]+|av\d+)/i.exec(url.pathname)?.[1];
-    if (!id) throw new DownloadIssue('请粘贴 B 站单个视频的 BV 或 AV 链接。');
-    const idParam = id.toLowerCase().startsWith('av') ? 'aid=' + id.slice(2) : 'bvid=' + id;
-    const metadata = await getJSON('https://api.bilibili.com/x/web-interface/view?' + idParam, origin, 'https://www.bilibili.com/');
-    if (metadata.code !== 0 || !metadata.data?.pages?.length) throw new DownloadIssue('B 站未开放该视频的信息，可能需要登录或验证。');
-    const part = Math.min(metadata.data.pages.length, Math.max(1, Number(url.searchParams.get('p')) || 1));
-    const page = metadata.data.pages[part - 1];
-    const stream = await getJSON('https://api.bilibili.com/x/player/playurl?' + idParam + '&cid=' + page.cid + '&qn=64&fnval=1&fnver=0&fourk=0&platform=html5', origin, 'https://www.bilibili.com/');
-    if (stream.code !== 0 || !stream.data?.durl?.length) throw new DownloadIssue('该视频当前未提供可直接下载的公开完整视频文件。');
-    const title = metadata.data.title + (metadata.data.pages.length > 1 ? ' - P' + part : '');
+    const rawID = /\/(BV[0-9a-z]{10}|av\d+)(?:\/|$)/i.exec(url.pathname)?.[1];
+    if (!rawID) throw new DownloadIssue('请粘贴 B 站单个视频的 BV 或 AV 链接。');
+    const id = rawID.replace(/^bv/i, 'BV').replace(/^av/i, 'av');
+    const part = Number(url.searchParams.get('p') || 1);
+    if (!Number.isSafeInteger(part) || part < 1) throw new DownloadIssue('分 P 参数无效。', 400);
+    const canonical = new URL('https://www.bilibili.com/video/' + id + '/');
+    if (part > 1) canonical.searchParams.set('p', String(part));
+    const getBilibiliJSON = async (path, stage) => {
+      try { return await getJSON('https://api.bilibili.com' + path, origin, canonical.href); }
+      catch (error) {
+        if (error instanceof DownloadIssue && [403, 412, 429].includes(error.upstreamStatus)) {
+          throw new DownloadIssue('B 站在' + stage + '时限制了本站服务器访问（HTTP ' + error.upstreamStatus + '）。' +
+            '当前无法从网页下载此视频；可打开原链接在 B 站观看。', 403);
+        }
+        throw error;
+      }
+    };
+
+    const nav = await getBilibiliJSON('/x/web-interface/nav', '获取播放器签名');
+    const images = nav.data?.wbi_img;
+    const imageKey = (value) => typeof value === 'string' ? /\/([a-f0-9]{32})\.[a-z]+(?:\?|$)/i.exec(value)?.[1] : '';
+    const mixin = wbiMixin(imageKey(images?.img_url), imageKey(images?.sub_url));
+    if (!mixin) throw new DownloadIssue('暂时无法取得 B 站播放器签名信息。', 502);
+
+    const identity = id.startsWith('BV') ? { bvid: id } : { aid: id.slice(2) };
+    const detailQuery = signBilibiliQuery({ ...identity, platform: 'web' }, mixin);
+    const detail = await getBilibiliJSON('/x/web-interface/wbi/view/detail?' + detailQuery, '读取视频信息');
+    const metadata = detail.data?.View;
+    if (detail.code === -352 || detail.code === -412) {
+      throw new DownloadIssue('B 站要求安全验证，当前无法读取视频信息。', 403);
+    }
+    if (detail.code !== 0 || !metadata?.bvid || !metadata?.cid) {
+      throw new DownloadIssue(detail.code === -403 || detail.code === -101
+        ? '该 B 站视频需要登录或相应观看权限。'
+        : detail.code === -404 ? '该视频已下架，或当前地区无法观看。'
+          : 'B 站未返回公开视频信息。');
+    }
+    if (id.startsWith('BV') && metadata.bvid !== id) throw new DownloadIssue('视频信息与请求的 BV 号不一致。');
+    const pages = Array.isArray(metadata.pages) && metadata.pages.length ? metadata.pages : [{ cid: metadata.cid }];
+    if (part > pages.length) throw new DownloadIssue('该视频没有第 ' + part + ' P。', 400);
+    const cid = pages[part - 1].cid;
+    if (!Number.isSafeInteger(cid) || cid <= 0) throw new DownloadIssue('B 站没有有效的分 P 信息。');
+    const query = signBilibiliQuery({
+      bvid: metadata.bvid, cid, qn: 64, fnval: 1, fnver: 0, fourk: 0,
+      platform: 'html5', high_quality: 1,
+    }, mixin);
+    const stream = await getBilibiliJSON('/x/player/wbi/playurl?' + query, '取得播放地址');
+    if (stream.code !== 0 || !stream.data?.durl?.length) {
+      throw new DownloadIssue(stream.code === -101 || stream.code === -403
+        ? '该视频需要 B 站登录或相应观看权限。'
+        : stream.code === -352 || stream.code === -412
+          ? 'B 站要求安全验证，当前无法取得下载地址。'
+          : '该视频当前未提供可直接下载的公开完整视频文件。');
+    }
+    const title = String(metadata.title || metadata.bvid) + (pages.length > 1 ? ' - P' + part : '');
+    const quality = stream.data.accept_description?.[stream.data.accept_quality?.indexOf(stream.data.quality)] ||
+      ({ 6: '240P', 16: '360P', 32: '480P', 64: '720P', 80: '1080P' })[stream.data.quality] || '公开视频';
+    const durations = stream.data.durl.map((entry) => Number(entry.length));
+    const partDuration = pages[part - 1].duration || (pages.length === 1 ? metadata.duration : 0);
+    if (Number.isFinite(partDuration) && partDuration > 60 &&
+      durations.every(Number.isFinite) && durations.reduce((a, b) => a + b, 0) < partDuration * 1000 * 0.9) {
+      throw new DownloadIssue('B 站返回了试看片段，当前无法取得完整视频。');
+    }
     return { title, files: stream.data.durl.slice(0, 12).filter((entry) => entry.url).map((entry, index, all) => ({
-      url: entry.url,
-      referer: 'https://www.bilibili.com/',
-      name: cleanName(title) + (all.length > 1 ? ' - 分段' + (index + 1) : '') + (/\.flv(?:\?|$)/.test(entry.url) ? '.flv' : '.mp4'),
-      label: (stream.data.accept_description?.[stream.data.accept_quality?.indexOf(stream.data.quality)] || '公开视频') +
-        (all.length > 1 ? ' · 分段 ' + (index + 1) : ' · 含音频'),
+      url: entry.url, referer: canonical.href,
+      name: cleanName(title) + (all.length > 1 ? ' - 分段' + (index + 1) : '') +
+        (/\.flv(?:\?|$)/.test(entry.url) ? '.flv' : '.mp4'),
+      label: quality + (all.length > 1 ? ' · 分段 ' + (index + 1) : ' · 含音频'),
     })) };
   }
 
@@ -315,7 +374,7 @@ export function createApp(assets, { fetch: upstreamFetch = (...args) => fetch(..
     const finalURL = new URL(fetched.url);
     if (/^b23\.tv$/i.test(url.hostname) && /(^|\.)bilibili\.com$/i.test(finalURL.hostname)) return bilibili(finalURL, origin);
     if (/(^|\.)(?:youtube\.com|youtu\.be)$/i.test(finalURL.hostname)) {
-      const player = playerJSON(html);
+      const player = assignedJSON(html, /(?:ytInitialPlayerResponse\s*=|["']ytInitialPlayerResponse["']\s*:)\s*\{/);
       const formats = player?.streamingData?.formats?.filter((format) => format.url && format.audioQuality && /^video\//.test(format.mimeType)) || [];
       if (!formats.length) throw new DownloadIssue('该 YouTube 链接需要平台签名、验证或登录，当前未取得可直接下载的音视频文件。');
       const title = player.videoDetails?.title || 'YouTube';

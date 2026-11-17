@@ -27,8 +27,11 @@ async function collect(directory, relative = '') {
 await collect(dist);
 await mkdir(path.join(dist, 'server'), { recursive: true });
 await mkdir(path.join(dist, '.openai'), { recursive: true });
+const signingSource = await readFile(path.join(root, 'worker', 'bilibili-sign.mjs'), 'utf8');
+const workerSource = (await readFile(path.join(root, 'worker', 'app.mjs'), 'utf8'))
+  .replace("import { signBilibiliQuery, wbiMixin } from './bilibili-sign.mjs';", '');
 await writeFile(path.join(dist, 'server', 'index.js'),
-  await readFile(path.join(root, 'worker', 'app.mjs'), 'utf8') +
+  signingSource + '\n' + workerSource +
   '\nconst assets = ' + JSON.stringify(assets) + ';\nexport default createApp(assets);\n');
 await writeFile(path.join(dist, '.openai', 'hosting.json'), await readFile(path.join(root, '.openai', 'hosting.json')));
 console.log('Built Worker with ' + Object.keys(assets).length + ' web assets.');
