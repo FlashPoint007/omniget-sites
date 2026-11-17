@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0e1421">
-  <meta name="description" content="OmniGet 网页下载工作台。批量整理链接、保存文件直链，并将平台媒体和磁力任务发送到本机 OmniGet。">
+  <meta name="description" content="OmniGet 网页下载工作台。粘贴文件或公开媒体页面链接，由浏览器直接下载文件。">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>OmniGet Web · 下载工作台</title>
@@ -38,8 +38,8 @@
       </a>
       <nav class="site-nav" aria-label="主导航">
         <a href="#workspace" aria-current="location">工作台</a>
-        <a href="#desktop">桌面版</a>
-        <a href="#guide">使用说明</a>
+        <a href="#guide">下载说明</a>
+
       </nav>
       <a class="button button-quiet repo-link" href="https://github.com/FlashPoint007/omniget-sites" target="_blank" rel="noopener noreferrer">
         <svg class="icon" aria-hidden="true"><use href="#i-github"></use></svg><span>GitHub</span>
@@ -51,11 +51,11 @@
     <section class="intro" aria-labelledby="main-title">
       <div>
         <h1 id="main-title">下载工作台</h1>
-        <p>粘贴文件或媒体链接，集中管理下载任务。</p>
+        <p>粘贴链接，文件直接进入浏览器下载列表。</p>
       </div>
-      <a class="button button-outline intro-link" href="#desktop">
-        <svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg>
-        下载桌面版
+      <a class="button button-outline intro-link" href="#guide">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
+        浏览器直接下载
         <svg class="icon small" aria-hidden="true"><use href="#i-arrow"></use></svg>
       </a>
     </section>
@@ -64,7 +64,7 @@
       <section class="panel composer" aria-labelledby="composer-title">
         <div class="panel-heading">
           <div class="section-icon accent"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg></div>
-          <div><h2 id="composer-title">添加链接</h2><p>支持文件直链、媒体页面和磁力链接</p></div>
+          <div><h2 id="composer-title">添加链接</h2><p>支持文件直链和可解析的公开音视频页面</p></div>
         </div>
         <form id="link-form">
           <div class="switcher" role="group" aria-label="输入方式">
@@ -78,33 +78,33 @@
           </div>
           <div class="composer-actions">
             <label class="select-field"><span class="visually-hidden">下载方式</span>
-              <select id="route"><option value="auto">自动识别</option><option value="direct">文件直链</option><option value="desktop">本机 OmniGet</option></select>
+              <select id="route"><option value="auto">自动解析</option><option value="direct">文件直链</option></select>
             </label>
             <button id="use-sample" class="button button-quiet sample" type="button">试用示例</button>
             <button id="import-links" class="button button-quiet" type="button" hidden><svg class="icon small" aria-hidden="true"><use href="#i-file"></use></svg>导入 TXT</button>
             <input id="file-input" type="file" accept=".txt,text/plain" hidden>
-            <button class="button button-primary submit" type="submit"><svg class="icon small" aria-hidden="true"><use href="#i-plus"></use></svg>加入队列</button>
+            <button class="button button-primary submit" type="submit"><svg class="icon small" aria-hidden="true"><use href="#i-download"></use></svg><span id="submit-label">解析并下载</span></button>
           </div>
           <p class="form-note" id="form-hint" role="status">签名链接和任务记录保留在当前浏览器会话。</p>
         </form>
       </section>
 
-      <aside class="panel bridge" aria-labelledby="bridge-title">
+      <aside class="panel bridge" aria-labelledby="browser-title">
         <div class="panel-heading">
-          <div class="section-icon cool"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg></div>
-          <div><h2 id="bridge-title">本机 OmniGet</h2><p>处理平台视频与磁力任务</p></div>
+          <div class="section-icon cool"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg></div>
+          <div><h2 id="browser-title">浏览器直接下载</h2><p>粘贴链接后，点击解析并下载</p></div>
         </div>
-        <div class="bridge-state" id="bridge-state" role="status"><span class="status-dot"></span><span id="bridge-status">未连接桌面端</span></div>
-        <p class="bridge-copy">配对后可批量发送任务，并在网页上查看桌面端进度。</p>
-        <button class="button button-outline bridge-action" id="open-bridge" type="button">连接桌面端<svg class="icon small" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
-        <a class="bridge-help" href="#guide">查看连接方法</a>
+        <div class="bridge-state" data-connected="true"><span class="status-dot"></span><span>网页下载已启用</span></div>
+        <p class="bridge-copy">文件会进入浏览器下载列表，大文件也可以边传输边保存。</p>
+        <p class="bridge-copy">公开页面需包含可获取的完整媒体文件。遇到登录或平台限制时，队列会显示原因。</p>
+        <a class="bridge-help" href="#guide">查看支持范围</a>
       </aside>
 
       <section class="panel queue" aria-labelledby="queue-title">
         <div class="queue-heading">
           <div class="panel-heading">
             <div class="section-icon neutral"><svg class="icon" aria-hidden="true"><use href="#i-tray"></use></svg></div>
-            <div><h2 id="queue-title">下载队列 <span class="counter" id="queue-count">0</span></h2><p>选择任务的下载方式并查看状态</p></div>
+            <div><h2 id="queue-title">下载队列 <span class="counter" id="queue-count">0</span></h2><p>下载进度、暂停和取消可在浏览器下载列表中操作</p></div>
           </div>
           <div class="queue-controls">
             <button class="button button-outline" id="batch-send" type="button" hidden>发送待处理媒体</button>
@@ -115,7 +115,7 @@
           <button type="button" data-filter="all" aria-pressed="true">全部</button>
           <button type="button" data-filter="pending" aria-pressed="false">待处理</button>
           <button type="button" data-filter="active" aria-pressed="false">进行中</button>
-          <button type="button" data-filter="done" aria-pressed="false">已交接或完成</button>
+          <button type="button" data-filter="done" aria-pressed="false">已提交浏览器</button>
           <button type="button" data-filter="errors" aria-pressed="false">失败</button>
         </div>
         <div class="queue-empty" id="queue-empty">
@@ -127,7 +127,17 @@
       </section>
     </div>
 
-    <section class="section-block" id="desktop" aria-labelledby="desktop-title">
+    <section class="section-block" id="desktop" hidden aria-labelledby="desktop-title">
+      <aside class="panel bridge" aria-labelledby="bridge-title">
+        <div class="panel-heading">
+          <div class="section-icon cool"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg></div>
+          <div><h2 id="bridge-title">本机 OmniGet</h2><p>处理平台视频与磁力任务</p></div>
+        </div>
+        <div class="bridge-state" id="bridge-state" role="status"><span class="status-dot"></span><span id="bridge-status">未连接桌面端</span></div>
+        <p class="bridge-copy">配对后可批量发送任务，并在网页上查看桌面端进度。</p>
+        <button class="button button-outline bridge-action" id="open-bridge" type="button">连接桌面端<svg class="icon small" aria-hidden="true"><use href="#i-arrow"></use></svg></button>
+        <a class="bridge-help" href="#guide">查看连接方法</a>
+      </aside>
       <div class="section-title">
         <div>
           <h2 id="desktop-title">下载 OmniGet 桌面版</h2>
@@ -151,30 +161,26 @@
     <section class="section-block" id="guide" aria-labelledby="guide-title">
       <div class="section-title"><div><h2 id="guide-title">使用说明</h2></div></div>
       <div class="panel guide">
-        <details>
-          <summary>如何保存文件直链？</summary>
-          <p>把文件地址加入队列，点击「保存文件」。源站需允许浏览器跨域读取。遇到跨域限制可点「打开源文件」，再使用浏览器的保存功能。对于无扩展名的文件，添加时可手动选择「文件直链」。</p>
-          <p>普通保存最多在内存中读取 64 MiB。支持文件选择器的浏览器可用「流式保存」直接写入本机。</p>
+        <details open>
+          <summary>粘贴链接后如何直接下载？</summary>
+          <p>粘贴 HTTP 或 HTTPS 链接，点击「解析并下载」。文件直链会直接交给浏览器；公开媒体页面会尝试提取完整的音频或视频文件。</p>
+          <p>一个页面提供多个文件时，可在队列中选择文件。批量模式先加入队列，再逐条点击「浏览器下载」。</p>
         </details>
         <details id="guide-bridge">
-          <summary>如何连接本机 OmniGet？</summary>
-          <ol>
-            <li>安装并启动 OmniGet v0.15.1 或更新版本。</li>
-            <li>在「设置 → 插件 → 浏览器扩展」找到本机端点和配对令牌。</li>
-            <li>点网页的「连接桌面端」，填写端口和令牌。浏览器可能会请求访问本机网络。</li>
-            <li>发送任务后，按桌面端设置选择下载目录或使用默认目录。连接失败时，也可以逐条点「用桌面打开」。</li>
-          </ol>
+          <summary>支持哪些链接？</summary>
+          <p>支持公网文件直链、包含 video、audio 或公开媒体元数据的网页，以及提供公开完整文件的 B 站视频。YouTube 仅能处理平台返回可直接读取的完整音视频地址的情况。</p>
+          <p>需要登录、付费权限、加密、签名验证或分片合并的内容可能无法下载。磁力链接使用 BitTorrent 协议，当前网页下载接受 HTTP(S) 地址。</p>
         </details>
         <details>
-          <summary>哪些功能在桌面端处理？</summary>
-          <p>哔哩哔哩、YouTube、Instagram 等媒体页面，HLS / DASH 和磁力任务交给桌面 OmniGet。Udemy、Hotmart 和 Telegram 由桌面插件处理，转码、转写和阅读工具也在桌面端使用。</p>
-          <p>网页只发送选中的任务链接和桌面控制请求到本机 OmniGet。需要登录的内容请在桌面端按上游流程授权。</p>
+          <summary>在哪里查看进度和保存位置？</summary>
+          <p>浏览器负责选择或使用默认下载目录，并显示实际进度、暂停、取消和完成状态。网页中的「已交给浏览器」表示已发起下载。</p>
+          <p>源站可能限流、返回过期链接或中断传输。遇到失败时，可点击「重新解析下载」获取新地址。大文件通过流式传输保存。</p>
         </details>
       </div>
     </section>
 
     <footer class="footer">
-      <div class="footer-info"><svg class="icon small" aria-hidden="true"><use href="#i-lock"></use></svg>文件由浏览器或本机 OmniGet 下载</div>
+      <div class="footer-info"><svg class="icon small" aria-hidden="true"><use href="#i-lock"></use></svg>文件由浏览器下载 · 链接记录保留在当前会话</div>
       <div>GPL-3.0 · 基于 <a href="https://github.com/OpenSelena/omniget" target="_blank" rel="noopener noreferrer">OpenSelena/omniget</a></div>
     </footer>
   </main>

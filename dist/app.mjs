@@ -2,6 +2,7 @@ import { desktopScheme, formatBytes, parseLines, readLink, ROUTE_LABELS } from '
 import { connectBridge } from './lib/bridge.mjs';
 import { createTaskTracker } from './lib/task-tracker.mjs';
 import { DownloadError, saveDirect } from './lib/download.mjs';
+import { BrowserDownloadError, resolveBrowserDownload, startBrowserDownload } from './lib/browser-download.mjs';
 import { assetsFor, fetchRelease } from './lib/releases.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +10,7 @@ const $$ = (query) => [...document.querySelectorAll(query)];
 const STATUS = {
   pending: ['待处理', 'pending'],
   receiving: ['正在读取', 'active'],
+  resolving: ['正在解析', 'active'],
   browser: ['已交给浏览器', 'done'],
   saved: ['已保存', 'done'],
   sending: ['正在发送', 'active'],
@@ -42,6 +44,7 @@ let pollFailures = 0;
 let sendingBatch = false;
 let toastTimeout;
 let directTransfer = null;
+const resolutions = new Map();
 let release = null;
 let releaseOrigin = '';
 let activeOS = initialOS();
@@ -82,9 +85,9 @@ function restoreQueue() {
     if (!Array.isArray(saved)) return [];
     return saved.slice(0, MAX_ITEMS).flatMap((item) => {
       if (!item || typeof item.url !== 'string' || !/^[0-9a-f-]{36}$/i.test(item.id)) return [];
-      const link = readLink(item.url, item.mode);
+      const link = readLink(item.url, item.url.startsWith('magnet:') ? 'desktop' : item.mode);
       if (!link) return [];
-      const interrupted = item.state === 'receiving';
+      const interrupted = item.state === 'receiving' || item.state === 'resolving';
       const unconfirmed = item.state === 'sending' || TRACKED.has(item.state);
       return [{
         ...link,
@@ -120,6 +123,7 @@ function setInputMode(mode) {
   $('input-box').classList.toggle('is-batch', batch);
   $('import-links').hidden = !batch;
   links.rows = batch ? 4 : 1;
+  $('submit-label').textContent = batch ? '加入队列' : '解析并下载';
   links.placeholder = batch ? '每行一条链接\nhttps://…' : 'https://…';
 }
 
@@ -143,11 +147,20 @@ function readInput() {
   const result = [];
   if (added.length) result.push('已添加 ' + added.length + ' 条');
   if (duplicates) result.push('跳过 ' + duplicates + ' 条重复链接');
-  if (invalid.length) result.push('第 ' + invalid.slice(0, 8).join('、') + (invalid.length > 8 ? ' 等' : '') + ' 行无效，请每行提供一条 HTTP(S) 或磁力链接');
+  if (invalid.length) result.push('第 ' + invalid.slice(0, 8).join('、') + (invalid.length > 8 ? ' 等' : '') + ' 行无效，请每行提供一条 HTTP(S) 链接');
   if (full) result.push('队列已满，请清理后再添加');
   if (!result.length) result.push('请输入下载链接');
   message('form-hint', result.join('，') + '。', invalid.length || full ? 'error' : added.length ? 'success' : '');
-  if (!added.length) return;
+  if (!added.length) {
+    if (inputMode === 'single' && incoming.length === 1 && duplicates === 1) {
+      const existing = items.find((item) => item.url === incoming[0].url);
+      if (existing?.route === 'direct') {
+        existing.mode = mode;
+        void runBrowser(existing);
+      }
+    }
+    return;
+  }
   items.unshift(...added);
   filter = 'all';
   if (invalid.length && !full) {
@@ -158,6 +171,7 @@ function readInput() {
   }
   persist();
   renderQueue();
+  if (inputMode === 'single' && added.length === 1 && added[0].route === 'direct') void runBrowser(added[0]);
 }
 
 function action(name, label, variant = 'quiet', href = '') {
@@ -198,25 +212,33 @@ function renderItem(item) {
   progress.max = 100;
   progress.setAttribute('aria-label', '下载进度');
   if (item.pct != null) progress.value = item.pct;
-  progress.hidden = item.pct == null && item.state !== 'receiving';
+  progress.hidden = item.pct == null && !['receiving', 'resolving'].includes(item.state);
   const bytes = element('span', 'item-detail transfer-bytes', item.bytes || '');
   status.append(progress, bytes);
 
   const actions = element('div', 'item-actions');
-  if (item.state === 'receiving') {
-    actions.append(action('cancel', '取消读取', 'outline'));
+  if (item.state === 'receiving' || item.state === 'resolving') {
+    actions.append(action('cancel', '取消操作', 'outline'));
   } else if (item.state !== 'sending') {
     if (item.route === 'direct') {
-      const save = action('save', '保存文件', 'outline');
-      save.disabled = Boolean(directTransfer);
-      actions.append(save);
-      if (typeof window.showSaveFilePicker === 'function' && window.top === window.self) {
-        const stream = action('stream', '流式保存');
+      if (item.files?.length > 1) {
+        const select = element('select', 'file-choice');
+        select.setAttribute('aria-label', '下载文件');
+        for (const [index, file] of item.files.entries()) {
+          const option = element('option', '', file.label || file.name);
+          option.value = String(index);
+          select.append(option);
+        }
+        select.value = String(item.fileIndex || 0);
+        actions.append(select);
+      }
+      actions.append(action('save', item.state === 'error' ? '重新解析下载' : '浏览器下载', 'outline'));
+      if (item.files?.length && typeof window.showSaveFilePicker === 'function' && window.top === window.self) {
+        const stream = action('stream', '选择保存位置');
         stream.disabled = Boolean(directTransfer);
         actions.append(stream);
       }
-      actions.append(action('source', '打开源文件', 'quiet', item.url));
-      if (item.state === 'error') actions.append(action('open', '用桌面打开', 'quiet', desktopScheme(item.url)));
+      actions.append(action('source', '原始链接', 'quiet', item.url));
     } else if (item.route === 'plugin') {
       actions.append(action('guide', item.plugin + ' 插件说明', 'outline', '#guide'), action('copy', '复制链接'));
     } else {
@@ -279,7 +301,9 @@ async function runDirect(item, stream) {
   let result;
   let failure;
   try {
-    result = await saveDirect(item, {
+    const file = item.files?.[item.fileIndex || 0];
+    if (!file) throw new DownloadError('请先解析下载链接。');
+    result = await saveDirect({ ...item, url: file.href, filename: file.name }, {
       controller,
       stream,
       onProgress(received, total) {
@@ -301,6 +325,30 @@ async function runDirect(item, stream) {
   if (result) setItem(item, result.saved ? 'saved' : 'browser', formatBytes(result.received), 100);
   else if (failure?.name === 'AbortError' || controller.signal.aborted) setItem(item, 'pending', '已取消读取。');
   else setItem(item, 'error', failure instanceof DownloadError ? failure.message : '保存失败，请检查文件写入权限或打开源文件。');
+}
+
+async function runBrowser(item) {
+  if (resolutions.has(item.id) || item.state === 'receiving' || !items.includes(item)) return;
+  const controller = new AbortController();
+  resolutions.set(item.id, controller);
+  setItem(item, 'resolving', '正在获取可下载文件…');
+  try {
+    const result = await resolveBrowserDownload(item, controller.signal);
+    if (!items.includes(item) || controller.signal.aborted) return;
+    item.title = String(result.title || item.title).slice(0, 180);
+    item.files = result.files;
+    item.fileIndex = Math.min(item.fileIndex || 0, item.files.length - 1);
+    await startBrowserDownload(item.files[item.fileIndex], controller.signal);
+    if (items.includes(item)) {
+      setItem(item, 'browser', '已提交浏览器下载，请在浏览器下载列表中查看进度和结果。');
+    }
+  } catch (error) {
+    if (!items.includes(item)) return;
+    if (error.name === 'AbortError' || controller.signal.aborted) setItem(item, 'pending', '已取消解析。');
+    else setItem(item, 'error', error instanceof BrowserDownloadError ? error.message : '解析暂时失败，请稍后重试。');
+  } finally {
+    resolutions.delete(item.id);
+  }
 }
 
 function renderBridge() {
@@ -452,7 +500,7 @@ $('use-sample').addEventListener('click', () => {
   links.value = SAMPLE_URL;
   $('route').value = 'auto';
   links.focus();
-  message('form-hint', '示例已填入，加入队列后即可保存。');
+  message('form-hint', '示例已填入，点击「解析并下载」即可保存。');
 });
 $('import-links').addEventListener('click', () => $('file-input').click());
 $('file-input').addEventListener('change', async (event) => {
@@ -472,19 +520,24 @@ $('file-input').addEventListener('change', async (event) => {
   }
 });
 
+queueList.addEventListener('change', (event) => {
+  const choice = event.target.closest('.file-choice');
+  const item = items.find(({ id }) => id === choice?.closest('[data-id]')?.dataset.id);
+  if (item) item.fileIndex = Number(choice.value) || 0;
+});
+
 queueList.addEventListener('click', async (event) => {
   const control = event.target.closest('[data-action]');
   const item = items.find(({ id }) => id === control?.closest('[data-id]')?.dataset.id);
   if (!item) return;
   const selected = control.dataset.action;
-  if (selected === 'save' || selected === 'stream') void runDirect(item, selected === 'stream');
-  if (selected === 'cancel') directTransfer?.controller.abort();
-  if (selected === 'send') void sendOne(item);
-  if (selected === 'source' && !['browser', 'saved'].includes(item.state)) {
-    setTimeout(() => {
-      if (items.includes(item)) setItem(item, 'browser', '已请求打开源文件，可在浏览器中保存。');
-    }, 0);
+  if (selected === 'save') void runBrowser(item);
+  if (selected === 'stream') void runDirect(item, true);
+  if (selected === 'cancel') {
+    resolutions.get(item.id)?.abort();
+    if (directTransfer?.id === item.id) directTransfer.controller.abort();
   }
+  if (selected === 'send') void sendOne(item);
   if (selected === 'open') {
     if (!TRACKED.has(item.state) && item.state !== 'desktop-done') {
       setTimeout(() => {

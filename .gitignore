@@ -3,3 +3,5 @@
 .env.*
 node_modules/
 .openai/local.json
+/dist/server/
+/dist/.openai/

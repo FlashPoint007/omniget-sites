@@ -1,133 +1,101 @@
 <div align="center">
   <img src="dist/assets/omniget.png" width="84" alt="OmniGet application icon">
   <h1>OmniGet Web</h1>
-  <p><strong>链接在网页整理，下载由浏览器或本机完成。</strong></p>
-  <p>A lightweight download workbench for your browser and desktop.</p>
+  <p><strong>粘贴链接，浏览器直接下载文件。</strong></p>
+  <p>Paste a link. Download with your browser.</p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><a href="https://omniget.tarokiki.chatgpt.site">在线体验</a> · <a href="#快速开始">快速开始</a> · <a href="#系统架构">系统架构</a> · <a href="https://github.com/OpenSelena/omniget/releases/latest">桌面端下载</a></p>
+  <p><a href="https://omniget.tarokiki.chatgpt.site">在线体验</a> · <a href="#快速开始">快速开始</a> · <a href="#系统架构">系统架构</a></p>
 </div>
 
 ![OmniGet Web visual overview](docs/images/hero.svg)
 
-## 一个轻量入口，两条下载路径
+## 网页直接下载
 
-OmniGet Web 是 [OmniGet](https://github.com/OpenSelena/omniget) 的独立 Sites 网页适配。无需构建工具：打开网页，整理链接，将文件直链交给浏览器，或将支持的媒体任务交给本机 OmniGet。
+OmniGet Web 是 [OmniGet](https://github.com/OpenSelena/omniget) 的独立网页适配。粘贴 HTTP(S) 链接并点击 **解析并下载**，站点获取可下载文件后，直接交给浏览器的下载管理器。
 
-> **它不是云端下载服务器，也不是完整版桌面应用。** 平台解析、下载位置、清晰度、格式与登录状态由本机桌面端决定。课程、Telegram、转码、转写和阅读等功能仍在桌面端使用。
+| 能力 | 使用方式与范围 |
+| --- | --- |
+| 文件直链 | 公网 HTTP(S) 文件，包含签名地址和没有扩展名的文件接口 |
+| 网页媒体解析 | 读取 HTML video、audio、source、Open Graph 和 JSON-LD 中的完整媒体文件 |
+| B 站视频 | 获取平台公开返回的完整视频文件，支持链接中的分 P 参数；画质和可用性由源站决定 |
+| YouTube | 仅支持页面返回可直接读取的完整音视频地址的情况；需要额外签名或验证时显示失败原因 |
+| 大文件 | Worker 流式转发，浏览器下载管理器接收；主下载流程无需把文件完整放进网页内存 |
+| 多文件和批量 | 多媒体页面可选择文件；批量粘贴和 UTF-8 TXT 导入后，逐条发起下载 |
+| 队列 | 去重、状态筛选、最多 50 项，保存在当前浏览器会话 |
 
-| 能力 | 你能做什么 | 实际边界 |
-| --- | --- | --- |
-| 链接工作台 | 单条、批量粘贴，UTF-8 TXT 导入，识别平台、去重和状态筛选 | 队列最多 50 项；TXT 上限 128 KiB |
-| 文件直链 | 保存 HTTP(S) 文件，查看读取进度，取消读取 | 源站需允许跨域；普通缓冲保存上限 64 MiB |
-| 流式保存 | 直接写入本地磁盘，避免完整文件驻留内存 | 仅在支持文件选择器的顶层桌面浏览器显示 |
-| 桌面接管 | 配对后逐条或批量发送；也可通过 `omniget:` 协议交接 | 本机需运行兼容桌面端；接收成功不等于下载完成 |
-| 进度回传 | 查看与网页已发送链接匹配的桌面任务 | 连接有效且页面可见时轮询，不展示完整桌面队列 |
-| 安装包入口 | 按 Windows、macOS、Linux 展示上游发行资产 | 在线读取 GitHub；不可用时回退内置记录，摘要仅在上游提供时显示 |
+需要登录、付费权限、DRM、额外签名或分片合并的内容可能无法处理。磁力链接使用 BitTorrent 协议，网页入口接受 HTTP(S) 地址。
 
 ## 快速开始
 
-### 只保存文件直链
+1. 打开 [在线工作台](https://omniget.tarokiki.chatgpt.site)。
+2. 粘贴文件或公开媒体页面链接，点击 **解析并下载**。也可以点击 **试用示例** 体验。
+3. 在浏览器下载列表中查看实际进度、暂停、取消和完成状态。
+4. 页面有多个文件时，在队列中选择目标文件，再点击 **浏览器下载**。
 
-1. 打开 [在线工作台](https://omniget.tarokiki.chatgpt.site)，或按下方说明本地运行。
-2. 粘贴可直接读取的文件 URL，加入队列。
-3. 点击 **保存文件**；支持的浏览器还可选择 **流式保存**。
-4. 若源站禁止跨域或链接失效，尝试 **打开源文件**，或交给桌面端。网页不会绕过源站限制。
-
-### 连接本机 OmniGet
-
-1. 从 [上游 Releases](https://github.com/OpenSelena/omniget/releases/latest) 安装并启动 **v0.15.1 或更新版本**。
-2. 在桌面端打开 **设置 → 插件 → 浏览器扩展**，复制本机端点与配对令牌。
-3. 在网页点击 **连接桌面端**，粘贴端点和令牌；如出现浏览器本地网络权限提示，确认后才能访问本机服务。
-4. 添加媒体链接并点击 **发送到本机**。桌面端可能仍要求选择下载位置或确认任务。
-5. 无法配对时，可使用 **用桌面打开**，通过 `omniget:` 协议交接单条任务。
-
-**这里的“本机”是运行浏览器的设备。** 手机网页中的 `127.0.0.1` 不会自动指向你的电脑。不要将本机桥接端口或配对令牌公开到互联网。
+网页的「已交给浏览器」表示已提交下载。若源站返回过期地址或下载中断，点击 **重新解析下载** 获取新地址。
 
 ## 系统架构
 
 ![OmniGet Web bilingual architecture](docs/images/architecture.svg)
 
-[查看架构图源文件](docs/images/architecture.svg)
-
-- **静态层**：Sites 仅提供 `dist/` 中的 HTML、CSS、ES modules 和静态资源，没有应用后端代理下载。
-- **浏览器层**：`app.mjs` 编排 UI 与队列；`links.mjs` 与 `detect.mjs` 解析并分流链接。
-- **文件路径**：`download.mjs` 直接读取文件源，采用 Blob 缓冲保存或文件系统流式写入。
-- **桌面路径**：`bridge.mjs` 访问 `http://127.0.0.1:<port>` 的 `/v1/health`、`/v1/enqueue`、`/v1/queue`。队列与提交接口使用 Bearer 配对令牌。
-- **发行信息**：`releases.mjs` 获取 GitHub 最新版本，并以 `assets/releases.json` 作为回退。
+| 模块 | 职责 |
+| --- | --- |
+| `dist/index.html`、`app.mjs` | 输入、会话队列和下载操作 |
+| `dist/lib/browser-download.mjs` | 调用解析接口、检查源文件、触发浏览器原生下载 |
+| `worker/app.mjs` | 公网地址检查、页面和平台解析、签名下载地址、流式转发 |
+| `POST /api/resolve` | 返回可下载文件及限时下载地址 |
+| `GET /api/download` | 使用附件响应向浏览器流式传输，按源站能力转发 Range 请求 |
+| `scripts/build.mjs` | 将网页资源打包进单个 Worker 模块 |
 
 ### 数据与隐私
 
 | 数据 | 保存或发送位置 |
 | --- | --- |
-| 链接、任务状态（可能包含签名 URL） | 当前浏览器会话的 `sessionStorage`；禁用存储时仅在内存中 |
-| 配对令牌 | 仅页面内存，刷新后需重新连接 |
-| 媒体地址与桌面令牌 | 不经过 Sites 后端；需要时发送到本机桌面桥接 |
-| 下载文件 | 浏览器或桌面端直接从来源读取 |
-| 安装包元数据 | 浏览器请求 GitHub API；失败时读取内置记录 |
+| 链接、队列状态 | 当前浏览器会话的 `sessionStorage` |
+| 待解析链接 | 发给本站 Worker，并请求链接指向的公网来源 |
+| 文件内容 | 从源站经 Worker 流式传输给浏览器 |
+| 下载签名密钥 | Sites 的运行环境 Secret |
+| 下载地址 | 有效期两小时，刷新或过期后重新解析 |
 
-清除网页队列不会取消已经交给桌面端的任务。发送后若未收到确认，先检查桌面队列，避免盲目重试造成重复任务。
+删除网页队列记录后，已启动的原生下载仍由浏览器下载管理器控制。
 
-## 本地运行
+## 本地运行与部署
 
-无需 npm 安装或构建步骤。使用 Python 3 启动静态服务器：
+使用 Node.js 22 或更新版本，无需安装 npm 依赖。
 
 ```sh
-python3 -m http.server 8080 --bind 127.0.0.1 --directory dist
+npm run dev
+npm test
+npm run build
 ```
 
-访问 [http://127.0.0.1:8080](http://127.0.0.1:8080)。请勿直接以 `file://` 打开 HTML，浏览器会限制模块加载。
+本地默认地址为 [127.0.0.1:3000](http://127.0.0.1:3000)。开发服务器使用本地专用签名密钥。
 
-### 部署到 Sites
-
-部署目录为 `dist`。注册自己的 Site 后，在项目根目录的 `.openai/hosting.json` 中填入返回的项目 ID：
+部署到 Sites 时，项目根目录的 `.openai/hosting.json` 填入自己的项目 ID。
 
 ```json
 {
-  "project_id": "YOUR_SITE_PROJECT_ID",
-  "static": { "directory": "dist" }
+  "project_id": "YOUR_SITE_PROJECT_ID"
 }
 ```
 
-不要将个人令牌或真实凭证写进部署配置、README 或提交记录。
-
-## 目录导航
-
-```text
-dist/
-├── index.html          # 页面结构
-├── app.mjs             # UI、会话队列、任务编排
-├── assets/
-│   ├── site.css        # 响应式样式
-│   ├── omniget.png     # 上游应用图标
-│   └── releases.json   # 发行信息回退
-├── lib/
-│   ├── links.mjs       # 链接解析与分流
-│   ├── detect.mjs      # 平台识别
-│   ├── download.mjs    # 浏览器文件保存
-│   ├── bridge.mjs      # 本机桥接与进度
-│   └── releases.mjs    # 安装包信息
-└── samples/            # 演示文件
-docs/images/            # README 矢量配图
-```
+在 Sites 运行环境中配置至少 32 字符的 Secret `DOWNLOAD_SIGNING_KEY`。执行构建后发布 `dist/server/index.js`。生成的 Worker 包含网页资源，使用同源接口完成解析与下载。
 
 ## 常见问题
 
-**为什么提示无法读取文件？**  
-文件源可能不允许 CORS、需要登录，或链接已经失效。尝试打开源文件；网页不会代理或绕过访问控制。
+**源站不允许浏览器跨域读取怎么办？**
+主下载流程通过本站转发文件，浏览器访问同源下载地址。源站的权限校验、限流和访问限制仍可能导致下载失败。
 
-**为什么连接不了桌面端？**  
-确认桌面端已运行、版本兼容、端点正确，且浏览器允许本地网络访问。令牌失效时复制当前令牌，刷新网页后重新配对。
+**能下载任意视频链接吗？**
+成功下载需要源站提供可获取的完整媒体文件。需要登录、DRM、签名验证或合并的内容可能返回具体失败原因。
 
-**“桌面端已接收”就是下载完成吗？**  
-不是。它只代表入队请求被确认，后续下载和可能的文件位置选择由桌面端处理。
-
-**能在网页直接下载平台视频、HLS/DASH 或磁力吗？**  
-这些任务交由桌面端解析和下载，网页仅负责整理与交接。
+**为什么队列已经显示「已交给浏览器」，但文件还没有保存完成？**
+该状态只表示下载已提交，实际进度和结果请查看浏览器下载列表。
 
 ## 上游与许可证
 
-本项目是 [OpenSelena/omniget](https://github.com/OpenSelena/omniget) 的独立网页适配，不是上游桌面程序的完整替代。上游由 **igect** 维护，基于 **Tonho** 的原版架构。
+本项目是 [OpenSelena/omniget](https://github.com/OpenSelena/omniget) 的独立网页适配。上游由 **igect** 维护，基于 **Tonho** 的原版架构。
 
 网页使用上游 [`51d00c7`](https://github.com/OpenSelena/omniget/tree/51d00c75cf7bc339cf4e657a3b394a19968580fd) 的应用图标、扩展平台检测、下载单位格式和本机接口；桌面构建产物仍由上游发行。README 配图是文档示意图，不是运行截图。
 
-本项目使用 [GPL-3.0](LICENSE)。仅下载你拥有权利或获准获取的内容，并遵守来源服务的使用条款。
+本项目使用 [GPL-3.0](LICENSE)。

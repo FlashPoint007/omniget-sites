@@ -284,3 +284,5 @@ dialog button[type="submit"] { margin-top: 6px; justify-self: end; }
   .section-title { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+.file-choice { max-width: 175px; min-height: 33px; padding: 4px 7px; border: 1px solid #3a4860; border-radius: 8px; background: #172237; font-size: 12px; }

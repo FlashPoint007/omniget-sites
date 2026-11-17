@@ -22,7 +22,7 @@ const PLATFORMS = {
   udemy: 'Udemy',
 };
 
-export const ROUTE_LABELS = { direct: '文件直链', desktop: '本机 OmniGet', plugin: '桌面插件' };
+export const ROUTE_LABELS = { direct: '浏览器下载', desktop: '本机 OmniGet', plugin: '桌面插件' };
 
 function decoded(value) {
   try {
@@ -60,7 +60,7 @@ export function readLink(line, mode = 'auto') {
     const validHash = parsed.searchParams.getAll('xt').some((hash) =>
       /^urn:btih:(?:[0-9a-f]{40}|[a-z2-7]{32})$/i.test(hash) ||
       /^urn:btmh:1220[0-9a-f]{64}$/i.test(hash));
-    if (!validHash || mode === 'direct') return null;
+    if (!validHash || mode !== 'desktop') return null;
     return {
       url: 'magnet:' + parsed.href.slice(7),
       route: 'desktop',
@@ -81,11 +81,10 @@ export function readLink(line, mode = 'auto') {
   const filename = safeFilename(segment);
   const looksLikeFile = FILE_EXTENSION.test(path);
   const manifest = MANIFEST_EXTENSION.test(path);
-  let route = 'desktop';
-  if (mode === 'direct' || (mode === 'auto' && looksLikeFile && !plugin)) route = 'direct';
-  if (plugin && mode !== 'direct') route = 'plugin';
+  let route = mode === 'desktop' ? 'desktop' : 'direct';
+  if (plugin && mode === 'desktop') route = 'plugin';
 
-  const platform = PLATFORMS[media?.platform] || (route === 'direct' ? 'HTTP 文件' : manifest ? 'HLS / DASH' : '');
+  const platform = PLATFORMS[media?.platform] || (looksLikeFile || mode === 'direct' ? 'HTTP 文件' : manifest ? 'HLS / DASH' : '');
   const mediaId = media?.platform === 'youtube'
     ? parsed.searchParams.get('v') || parsed.searchParams.get('list') || segment
     : segment;
@@ -96,7 +95,7 @@ export function readLink(line, mode = 'auto') {
     plugin,
     platform,
     source: hostname,
-    title: looksLikeFile || manifest || (route === 'direct' && segment) ? filename : pageTitle,
+    title: looksLikeFile || manifest || (mode === 'direct' && segment) ? filename : pageTitle,
     filename,
   };
 }
